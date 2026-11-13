@@ -51,6 +51,8 @@ build-iPhoneSimulator/
 
 # Serverless directories
 .serverless
+.wrangler
+.dev.vars*
 
 # package directories
 node_modules
