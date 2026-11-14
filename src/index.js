@@ -128,8 +128,10 @@ export default {
       return response({ message: 'Ignored message' });
     }
 
-    if (typeof message.bot_id !== 'string' || !message.bot_id) {
-      return response({ error: 'MeBots bot_id is required' }, 400);
+    // MeBots adds bot_id to each callback; direct GroupMe bots use the configured one.
+    const botId = typeof message.bot_id === 'string' && message.bot_id ? message.bot_id : env.GROUPME_BOT_ID;
+    if (!botId) {
+      return response({ error: 'bot_id is required (MeBots) or set GROUPME_BOT_ID (direct GroupMe bot)' }, 400);
     }
 
     const apod = await getApod();
@@ -146,7 +148,7 @@ export default {
     replies.push(...splitMessage(imageUrl));
 
     for (const text of replies) {
-      if (!(await postToGroupMe(message.bot_id, text))) {
+      if (!(await postToGroupMe(botId, text))) {
         return response({ error: 'GroupMe rejected the reply' }, 502);
       }
     }

@@ -255,6 +255,35 @@ test('strips the Explanation label and Tomorrow\'s picture teaser', async (conte
   assert.deepEqual(posts, ['NASA Image of the Day 2026-11-12\n\nPlanets wander.', 'https://example.com/image']);
 });
 
+test('uses GROUPME_BOT_ID for direct GroupMe callbacks without a bot_id', async (context) => {
+  const originalFetch = globalThis.fetch;
+  const botIds = [];
+  globalThis.fetch = async (input, init = {}) => {
+    if (String(input).startsWith('https://science.nasa.gov/wp-json/')) {
+      return Response.json([{ date: '2026-11-13', media_type: 'image', explanation: 'An image.', hdurl: 'https://example.com/image' }]);
+    }
+    botIds.push(JSON.parse(init.body).bot_id);
+    return new Response(null, { status: 202 });
+  };
+  context.after(() => { globalThis.fetch = originalFetch; });
+
+  const result = await worker.fetch(new Request(callbackUrl, {
+    method: 'POST',
+    body: JSON.stringify({ sender_type: 'user', text: 'nasa' }),
+  }), { ...env, GROUPME_BOT_ID: 'direct-bot' });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(botIds, ['direct-bot', 'direct-bot']);
+});
+
+test('rejects a callback with no bot_id when GROUPME_BOT_ID is not set', async () => {
+  const result = await worker.fetch(new Request(callbackUrl, {
+    method: 'POST',
+    body: JSON.stringify({ sender_type: 'user', text: 'nasa' }),
+  }), env);
+  assert.equal(result.status, 400);
+});
+
 test('reports a non-JSON APOD response as an upstream failure', async (context) => {
   const { result } = await runWithApod(context, () => new Response('<html>maintenance</html>', { status: 200 }));
   assert.equal(result.status, 502);
